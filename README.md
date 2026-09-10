@@ -58,6 +58,18 @@ project/
 - **Python 環境問題**：這台機器上 PATH 裡的 `python` 指向 MSYS64 的 Python（沒裝
   torch），實際要用的是 `C:\Users\user\AppData\Local\Programs\Python\Python312\python.exe`。
   已透過 `.vscode/settings.json` 設定 VSCode 預設直譯器解決。
+- **色弱類型條件輸入形同虛設**（已修正，V6→V7）：`train.py` 算 distinguish/palette
+  loss 時，不管模型當下被指定校正哪種色弱類型，永遠對 protanopia/deuteranopia/
+  tritanopia 三種都算一次再平均。結果模型學到一套「不管輸入哪種類型都套用同一套
+  通用校正」，實測（webcam demo）發現切到 tritanopia 模式時，校正後紅色反而被
+  推向綠色。修法：`cvd_simulation.simulate_cvd_per_sample` + `losses.py` 的
+  `cvd_type_idx` 參數，讓 loss 只用每張圖實際被指定的那一種類型去算。修正後
+  （V7）用同一批圖測試，tritanopia 模式下純紅/純藍/純黃都能維持原本色調（V2:
+  純紅被推向 (29,166,0) 綠色；V7: 純紅維持 (225,32,0) 紅色）。
+  **注意**：因為這個修正讓模型的校正變成真的跟色弱類型有關，`eval_checkpoint.py`
+  原本「不管條件輸入、三種類型都算再平均」的評分方式，對這種「有做條件式校正」
+  的模型反而不公平（會低估其表現）；比較 V7 這類版本時，要改成只用每張圖實際
+  被指定的 `cvd_type_idx` 去算 loss 才公平。
 
 ## 使用方式
 

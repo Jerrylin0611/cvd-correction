@@ -5,3 +5,4 @@
 2026-09-07T09:52:53,V4,checkpoints_v4/model_epoch50.pt,"w_palette=10,w_bias=5; synthetic_ratio=0.08",118.21,52.5,0.02788,0.01384,0.01948,0.00871,0.04416
 2026-09-10T21:31:19,V5,checkpoints_v5/model_epoch20.pt,"fine-tune from V2; targeted_ratio=0.1 (ConfusionPairBlocks), synthetic_ratio=0, lr=2e-5, 20 epochs",118.21,189.31,0.02788,0.0132,0.01948,0.0094,0.04463
 2026-09-10T22:56:06,V6,checkpoints_v6/model_epoch50.pt,loss 改成用 per-sample cvd_type_idx 對齊條件輸入 (但這次不小心用了預設 synthetic_ratio=0.15，混了 V3 的隨機合成色塊，不是乾淨對照),118.21,50.99,0.02788,0.02501,0.01948,0.01704,0.0148
+2026-09-10T23:28:12,V7,checkpoints_v7/model_epoch50.pt,loss 改成用 per-sample cvd_type_idx 對齊條件輸入; synthetic_ratio=0 (跟 V2 乾淨對照),118.21,53.36,0.02788,0.02762,0.01948,0.01836,0.01621
