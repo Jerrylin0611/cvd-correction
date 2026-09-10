@@ -13,3 +13,6 @@ __pycache__/
 
 # VSCode 設定裡寫死了這台機器的 Python 路徑，每個人電腦路徑不同，不要共用
 .vscode/
+
+# Claude Code 自己的設定資料夾，跟這個專案的原始碼無關
+.claude/
