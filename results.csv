@@ -1,0 +1,6 @@
+﻿timestamp,tag,checkpoint,notes,pure_color_diff_before,pure_color_diff_after,real_distinguish_before,real_distinguish_after,real_palette_before,real_palette_after,real_avg_pixel_change
+2026-09-07T09:01:12,OLD,checkpoints/model_epoch50.pt,"baseline: no palette/bias loss, no synthetic data",118.21,52.99,0.02788,0.01067,0.01948,0.01138,0.03889
+2026-09-07T09:01:17,V2,checkpoints_v2/model_epoch50.pt,"w_palette=10,w_bias=5 added; no synthetic data",118.21,22.69,0.02788,0.01102,0.01948,0.00808,0.04703
+2026-09-07T09:01:21,V3,checkpoints_v3/model_epoch50.pt,"w_palette=10,w_bias=5; synthetic_ratio=0.15",118.21,64.98,0.02788,0.01407,0.01948,0.00965,0.04673
+2026-09-07T09:52:53,V4,checkpoints_v4/model_epoch50.pt,"w_palette=10,w_bias=5; synthetic_ratio=0.08",118.21,52.5,0.02788,0.01384,0.01948,0.00871,0.04416
+2026-09-10T21:31:19,V5,checkpoints_v5/model_epoch20.pt,"fine-tune from V2; targeted_ratio=0.1 (ConfusionPairBlocks), synthetic_ratio=0, lr=2e-5, 20 epochs",118.21,189.31,0.02788,0.0132,0.01948,0.0094,0.04463
