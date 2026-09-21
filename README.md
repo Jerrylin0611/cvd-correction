@@ -30,6 +30,8 @@ project/
     ├── losses.py          # 自然度 + 結構(SSIM) + 可辨識度 loss
     ├── dataset.py          # 自監督訓練資料集
     ├── train.py            # 訓練腳本
+    ├── eval_checkpoint.py  # 色弱可辨識度評估，結果累加到 results.csv
+    ├── eval_metrics.py     # SSIM/MS-SSIM/CW-SSIM/LPIPS/PCDM 評估，結果累加到 metrics_summary.csv
     └── webcam_demo.py      # 即時 webcam demo
 ```
 
@@ -83,6 +85,16 @@ pip install -r requirements.txt
 cd src
 python train.py --data_dir "../data/val2017" --epochs 30 --batch_size 8
 ```
+
+影像品質指標評估（SSIM / MS-SSIM / CW-SSIM / LPIPS / PCDM，用來跟其他方法比較）：
+```
+cd src
+python eval_metrics.py --checkpoint checkpoints_v7/model_epoch50.pt --tag v7
+```
+預設三種色弱類型都算；每張圖的結果在 `metrics_results/`（不進版控），各版本平均值累加到
+`metrics_summary.csv`。這些指標量的是「校正後跟原圖有多像」（保真度），不是校正效果；
+跟其他方法比較時，資料集、圖片大小(256x256)、色弱類型都要對齊。CW-SSIM 用標準的 7x7
+局部視窗版（灰階），跟論文報的數值才有可比性。
 
 即時 webcam demo（訓練完成後）：
 ```

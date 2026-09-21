@@ -1,0 +1,4 @@
+﻿timestamp,tag,checkpoint,cvd_type,num_images,image_size,ssim_mean,ssim_std,ms_ssim_mean,ms_ssim_std,cw_ssim_mean,cw_ssim_std,lpips_mean,lpips_std,pcdm_mean,pcdm_std
+2026-09-21 21:59:00,v7,checkpoints_v7/model_epoch50.pt,protanopia,5000,256,0.974969,0.028336,0.989524,0.015256,0.990043,0.012277,0.046902,0.034515,5.313227,2.691935
+2026-09-21 21:59:00,v7,checkpoints_v7/model_epoch50.pt,deuteranopia,5000,256,0.982296,0.025793,0.994911,0.008852,0.997171,0.004221,0.033184,0.021696,4.685613,1.988921
+2026-09-21 21:59:00,v7,checkpoints_v7/model_epoch50.pt,tritanopia,5000,256,0.976570,0.027581,0.988522,0.014521,0.991447,0.011371,0.066492,0.056168,6.991029,4.328380

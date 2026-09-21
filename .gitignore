@@ -16,3 +16,6 @@ __pycache__/
 
 # Claude Code 自己的設定資料夾，跟這個專案的原始碼無關
 .claude/
+
+# eval_metrics.py 每張圖的指標結果 (可以重新跑腳本產生)；彙總的 metrics_summary.csv 有進版控
+metrics_results/
