@@ -27,12 +27,12 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
 
 from cvd_simulation import CVD_TYPES, simulate_cvd
-from dataset import ColorImageFolder
+from dataset import DEFAULT_SPLIT_SEED, DEFAULT_TEST_RATIO, ColorImageFolder
 from losses import distinguishability_loss, palette_distance_loss
 from model import LightUNetColorCorrector
 
 RESULTS_COLUMNS = [
-    "timestamp", "tag", "checkpoint", "notes",
+    "timestamp", "tag", "checkpoint", "split", "notes",
     "pure_color_diff_before", "pure_color_diff_after",
     "real_distinguish_before", "real_distinguish_after",
     "real_palette_before", "real_palette_after",
@@ -46,6 +46,12 @@ def parse_args():
     parser.add_argument("--tag", type=str, required=True, help="這次實驗的簡短代號，例如 v3, v4")
     parser.add_argument("--notes", type=str, default="", help="這次實驗的設定描述，例如 loss 權重/資料比例")
     parser.add_argument("--data_dir", type=str, default="../data/val2017")
+    parser.add_argument(
+        "--split", type=str, default="test", choices=["all", "train", "test"],
+        help="預設只評估 held-out 測試集，避免拿模型訓練時看過的圖打分數",
+    )
+    parser.add_argument("--test_ratio", type=float, default=DEFAULT_TEST_RATIO, help="要跟 train.py 的設定一致")
+    parser.add_argument("--split_seed", type=int, default=DEFAULT_SPLIT_SEED, help="要跟 train.py 的設定一致")
     parser.add_argument("--cvd_type", type=str, default="deuteranopia", choices=CVD_TYPES)
     parser.add_argument("--seed", type=int, default=0, help="固定 seed 抽同一批照片，確保跨版本結果可比較")
     parser.add_argument("--results_file", type=str, default="../results.csv")
@@ -86,7 +92,10 @@ def main():
 
     # --- 2. 真實照片批次 (固定 seed) ---
     torch.manual_seed(args.seed)
-    dataset = ColorImageFolder(args.data_dir, image_size=256)
+    dataset = ColorImageFolder(
+        args.data_dir, image_size=256, split=args.split,
+        test_ratio=args.test_ratio, split_seed=args.split_seed,
+    )
     loader = DataLoader(dataset, batch_size=16, shuffle=True, num_workers=0)
     images, cvd_type_idx = next(iter(loader))
     images, cvd_type_idx = images.to(device), cvd_type_idx.to(device)
@@ -107,6 +116,7 @@ def main():
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "tag": args.tag,
         "checkpoint": args.checkpoint,
+        "split": args.split,
         "notes": args.notes,
         "pure_color_diff_before": round(pure_diff_before, 2),
         "pure_color_diff_after": round(pure_diff_after, 2),

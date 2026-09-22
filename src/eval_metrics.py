@@ -43,11 +43,12 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
 
 from cvd_simulation import CVD_TYPES
+from dataset import DEFAULT_SPLIT_SEED, DEFAULT_TEST_RATIO, split_image_paths
 from model import LightUNetColorCorrector
 
 METRICS = ["ssim", "ms_ssim", "cw_ssim", "lpips", "pcdm"]
 SUMMARY_COLUMNS = (
-    ["timestamp", "tag", "checkpoint", "cvd_type", "num_images", "image_size"]
+    ["timestamp", "tag", "checkpoint", "cvd_type", "split", "num_images", "image_size"]
     + [f"{m}_{s}" for m in METRICS for s in ("mean", "std")]
 )
 
@@ -59,6 +60,13 @@ def parse_args():
     parser.add_argument("--cvd_type", type=str, default="all", choices=["all"] + CVD_TYPES)
     parser.add_argument("--data_dir", type=str, default="../data/val2017")
     parser.add_argument("--image_size", type=int, default=256)
+    parser.add_argument(
+        "--split", type=str, default="test", choices=["all", "train", "test"],
+        help="預設只評估 held-out 測試集 (跟訓練時保留的那份一致)，避免拿模型訓練時看過的圖打分數；"
+             "只有想重現舊版『全部都算』的行為時才用 all",
+    )
+    parser.add_argument("--test_ratio", type=float, default=DEFAULT_TEST_RATIO, help="要跟 train.py 的設定一致")
+    parser.add_argument("--split_seed", type=int, default=DEFAULT_SPLIT_SEED, help="要跟 train.py 的設定一致")
     parser.add_argument("--limit", type=int, default=0, help="只測前 N 張，0 = 全部")
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--out_dir", type=str, default="../metrics_results")
@@ -116,13 +124,16 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     cvd_types = CVD_TYPES if args.cvd_type == "all" else [args.cvd_type]
 
-    data_dir = Path(args.data_dir)
-    files = sorted(p for p in data_dir.iterdir() if p.suffix.lower() in (".jpg", ".jpeg", ".png"))
+    files = split_image_paths(
+        args.data_dir, split=args.split, test_ratio=args.test_ratio, split_seed=args.split_seed,
+        extensions={".jpg", ".jpeg", ".png"}, recursive=False,
+    )
     if args.limit:
         files = files[: args.limit]
-    if not files:
-        raise RuntimeError(f"找不到圖片：{data_dir}")
-    print(f"裝置：{device}｜圖片數：{len(files)}｜色弱類型：{cvd_types}｜size={args.image_size}")
+    print(
+        f"裝置：{device}｜split={args.split}｜圖片數：{len(files)}｜"
+        f"色弱類型：{cvd_types}｜size={args.image_size}"
+    )
 
     model = load_model(args.checkpoint, device)
     lpips_fn = lpips.LPIPS(net="alex", verbose=False).to(device).eval()
@@ -181,7 +192,7 @@ def main():
 
             stats = {m: np.array([r[m] for r in per_image], dtype=np.float64) for m in METRICS}
             sw.writerow(
-                [timestamp, args.tag, args.checkpoint, cvd, len(per_image), args.image_size]
+                [timestamp, args.tag, args.checkpoint, cvd, args.split, len(per_image), args.image_size]
                 + [f"{getattr(stats[m], s)():.6f}" for m in METRICS for s in ("mean", "std")]
             )
             print(f"[{cvd}] " + "  ".join(f"{m}={stats[m].mean():.4f}±{stats[m].std():.4f}" for m in METRICS))

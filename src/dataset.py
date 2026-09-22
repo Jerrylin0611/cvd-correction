@@ -19,14 +19,57 @@ from cvd_simulation import CVD_TYPES
 
 IMG_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
+# train.py 跟 eval_metrics.py/eval_checkpoint.py 都要用同一組預設值，
+# 這樣兩邊各自呼叫 split_image_paths 才會切出「不重疊」的 train/test。
+# 不要在個別腳本裡各自硬寫一份，否則兩邊改了其中一個就會悄悄重疊。
+DEFAULT_TEST_RATIO = 0.1
+DEFAULT_SPLIT_SEED = 42
+
+
+def split_image_paths(
+    root_dir: str,
+    split: str = "all",
+    test_ratio: float = DEFAULT_TEST_RATIO,
+    split_seed: int = DEFAULT_SPLIT_SEED,
+    extensions=IMG_EXTENSIONS,
+    recursive: bool = True,
+) -> list:
+    """
+    把資料夾底下的圖片路徑切成 train/test，訓練跟評估腳本共用，確保兩邊用同一個
+    seed + test_ratio 算出來的切法一致、不會重疊 (不用實際搬動檔案)。
+
+    split="all"：不切，回傳全部 (舊行為，向後相容)。
+    split="train"/"test"：用 split_seed 固定 shuffle 後，前 test_ratio 比例當 test，
+    其餘當 train。同一個資料夾、同樣的 test_ratio/split_seed，多次呼叫結果都一樣。
+    """
+    root = Path(root_dir)
+    it = root.rglob("*") if recursive else root.iterdir()
+    paths = sorted(p for p in it if p.suffix.lower() in extensions)
+    if not paths:
+        raise ValueError(f"在 {root_dir} 底下沒有找到任何圖片，請確認路徑是否正確")
+    if split == "all":
+        return paths
+    if split not in ("train", "test"):
+        raise ValueError(f"split 必須是 all/train/test，收到 {split!r}")
+
+    shuffled = paths[:]
+    random.Random(split_seed).shuffle(shuffled)
+    n_test = max(1, int(len(shuffled) * test_ratio))
+    return shuffled[:n_test] if split == "test" else shuffled[n_test:]
+
 
 class ColorImageFolder(Dataset):
-    """遞迴讀取資料夾下所有圖片，隨機裁切成固定大小，並隨機指定一個色弱類型當訓練目標。"""
+    """讀取資料夾下的圖片 (可指定 train/test split)，隨機裁切成固定大小，並隨機指定一個色弱類型當訓練目標。"""
 
-    def __init__(self, root_dir: str, image_size: int = 256):
-        self.paths = [p for p in Path(root_dir).rglob("*") if p.suffix.lower() in IMG_EXTENSIONS]
-        if not self.paths:
-            raise ValueError(f"在 {root_dir} 底下沒有找到任何圖片，請確認路徑是否正確")
+    def __init__(
+        self,
+        root_dir: str,
+        image_size: int = 256,
+        split: str = "all",
+        test_ratio: float = DEFAULT_TEST_RATIO,
+        split_seed: int = DEFAULT_SPLIT_SEED,
+    ):
+        self.paths = split_image_paths(root_dir, split, test_ratio, split_seed)
 
         self.transform = transforms.Compose([
             transforms.Resize(image_size),

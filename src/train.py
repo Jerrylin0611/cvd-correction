@@ -19,7 +19,7 @@ from torch.utils.data import ConcatDataset, DataLoader
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
 
-from dataset import ColorImageFolder
+from dataset import DEFAULT_SPLIT_SEED, DEFAULT_TEST_RATIO, ColorImageFolder
 from losses import ColorCorrectionLoss
 from model import LightUNetColorCorrector
 from synthetic_colors import ConfusionPairBlocks, SyntheticColorBlocks
@@ -32,6 +32,15 @@ def parse_args():
     parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--image_size", type=int, default=256)
+    parser.add_argument(
+        "--test_ratio", type=float, default=DEFAULT_TEST_RATIO,
+        help="保留給 eval_metrics.py/eval_checkpoint.py 當 held-out 測試集的比例，"
+             "訓練時不會用到這部分圖片；要跟 eval 腳本的 --test_ratio 一致才不會切出不同的切法",
+    )
+    parser.add_argument(
+        "--split_seed", type=int, default=DEFAULT_SPLIT_SEED,
+        help="train/test 切分用的固定 seed，要跟 eval 腳本的 --split_seed 一致",
+    )
     parser.add_argument("--w_natural", type=float, default=0.1, help="自然度 loss 權重")
     parser.add_argument("--w_structure", type=float, default=0.1, help="結構(SSIM) loss 權重")
     parser.add_argument("--w_distinguish", type=float, default=10.0, help="可辨識度(邊緣型) loss 權重")
@@ -63,9 +72,12 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"使用裝置: {device}")
 
-    dataset = ColorImageFolder(args.data_dir, image_size=args.image_size)
+    dataset = ColorImageFolder(
+        args.data_dir, image_size=args.image_size, split="train",
+        test_ratio=args.test_ratio, split_seed=args.split_seed,
+    )
     all_datasets = [dataset]
-    dataset_desc = [f"{len(dataset)} (真實照片)"]
+    dataset_desc = [f"{len(dataset)} (真實照片，已保留 {args.test_ratio:.0%} 當 held-out 測試集)"]
 
     n_synthetic = int(len(dataset) * args.synthetic_ratio)
     if n_synthetic > 0:
