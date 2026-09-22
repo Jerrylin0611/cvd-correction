@@ -76,6 +76,24 @@ project/
   V6/V7 實際更差——用修正後的評分方式重新測，V7 在三種色弱類型上都優於
   V2（distinguish loss 再降 15~59%、palette loss 再降 41~70%，見
   `_verify_v7_fair.py`），也優於完全不校正（58~86%）。
+- **train/test 沒切分**（已修正）：`dataset.py`/`train.py`/`eval_metrics.py`/
+  `eval_checkpoint.py` 原本都指向同一份 `data/val2017`，模型評估時用的是訓練時
+  看過的圖，數字可能只是背答案的假象。已加上 `dataset.split_image_paths()`
+  切出固定的 train(4500)/test(500)，`train.py` 只用 train、eval 腳本預設只用
+  test。**但 checkpoints_v2~v7 都是切分機制加入前訓練的**，這些版本沒辦法用
+  test split 得到乾淨數字。為了驗證「V7 是否只是背答案」，另外訓練了 V8
+  （設定同 V7，只是只用 train split 訓練），在從沒看過的 test split 上比較
+  （見 `_verify_v8_holdout.py`）：
+  - **可辨識度（distinguish/palette loss）在三種色弱類型上都有生成**：V8 沒看過
+    這 500 張圖，效果仍逼近甚至超過看過這些圖的 V2（例如 deuteranopia
+    distinguish 改善 V8 49.2% vs V2 30.4%），證實這個核心效果是真的學到
+    可泛化的校正策略，不是背答案。
+  - **但保真度指標（SSIM/LPIPS/PCDM）在 tritanopia 上有明顯的 train/test 落差**：
+    同一批 500 張 held-out 圖，V7（看過）tritanopia PCDM=6.86、LPIPS=0.064，
+    V8（沒看過）PCDM=11.06、LPIPS=0.097，protanopia/deuteranopia 則沒有這種
+    落差（V8 甚至持平或略贏）。代表 tritanopia 的顏色校正相對更吃訓練資料量/
+    多樣性，泛化能力比另外兩種類型弱，是目前一個真實存在、值得在報告裡揭露
+    的限制，之後可以考慮增加 tritanopia 相關的訓練資料或加強正則化。
 
 ## 使用方式
 

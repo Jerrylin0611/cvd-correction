@@ -6,3 +6,4 @@ timestamp,tag,checkpoint,split,notes,pure_color_diff_before,pure_color_diff_afte
 2026-09-10T21:31:19,V5,checkpoints_v5/model_epoch20.pt,all(訓練用同一份資料，非held-out),"fine-tune from V2; targeted_ratio=0.1 (ConfusionPairBlocks), synthetic_ratio=0, lr=2e-5, 20 epochs",118.21,189.31,0.02788,0.0132,0.01948,0.0094,0.04463
 2026-09-10T22:56:06,V6,checkpoints_v6/model_epoch50.pt,all(訓練用同一份資料，非held-out),loss 改成用 per-sample cvd_type_idx 對齊條件輸入 (但這次不小心用了預設 synthetic_ratio=0.15，混了 V3 的隨機合成色塊，不是乾淨對照),118.21,50.99,0.02788,0.02501,0.01948,0.01704,0.0148
 2026-09-10T23:28:12,V7,checkpoints_v7/model_epoch50.pt,all(訓練用同一份資料，非held-out),loss 改成用 per-sample cvd_type_idx 對齊條件輸入; synthetic_ratio=0 (跟 V2 乾淨對照),118.21,53.36,0.02788,0.02762,0.01948,0.01836,0.01621
+2026-09-22T11:11:07,V8,checkpoints_v8/model_epoch50.pt,test,"held-out 驗證: 只用 train split(4500張) 訓練, 設定同V7(synthetic_ratio=0, 50 epochs), 在從沒看過的500張test split上評估",118.21,67.36,0.02782,0.0106,0.01877,0.00389,0.01922
