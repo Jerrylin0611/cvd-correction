@@ -91,13 +91,16 @@ def main():
     images, cvd_type_idx = next(iter(loader))
     images, cvd_type_idx = images.to(device), cvd_type_idx.to(device)
 
-    real_dist_before = distinguishability_loss(images, images, CVD_TYPES).item()
-    real_pal_before = palette_distance_loss(images, images, CVD_TYPES).item()
+    # 用每張圖實際被指定的 cvd_type_idx 去算(不是三種類型都算再平均)，
+    # 這樣對 V6/V7 這種「條件輸入真的有作用」的模型才公平，
+    # 否則會低估其表現(見 README「已知問題與修正紀錄」)
+    real_dist_before = distinguishability_loss(images, images, cvd_type_idx=cvd_type_idx).item()
+    real_pal_before = palette_distance_loss(images, images, cvd_type_idx=cvd_type_idx).item()
 
     with torch.no_grad():
         corrected_real = model(images, cvd_type_idx)
-    real_dist_after = distinguishability_loss(corrected_real, images, CVD_TYPES).item()
-    real_pal_after = palette_distance_loss(corrected_real, images, CVD_TYPES).item()
+    real_dist_after = distinguishability_loss(corrected_real, images, cvd_type_idx=cvd_type_idx).item()
+    real_pal_after = palette_distance_loss(corrected_real, images, cvd_type_idx=cvd_type_idx).item()
     avg_pixel_change = (corrected_real - images).abs().mean().item()
 
     row = {
