@@ -60,6 +60,12 @@ def parse_args():
              "資料量小但每筆都打在死角上，用來取代/補強 --synthetic_ratio 那種隨機版本",
     )
     parser.add_argument(
+        "--targeted_cvd_type", type=str, default=None, choices=[None, "protanopia", "deuteranopia", "tritanopia"],
+        help="搭配 --targeted_ratio 使用：只指定生成某一種色弱類型的混淆對色塊 "
+             "(預設 None = 三種類型隨機混合，會連帶改變另外兩種類型的訓練資料分布)，"
+             "用來做『只補強單一類型、其餘類型訓練分布不變』的乾淨對照實驗",
+    )
+    parser.add_argument(
         "--init_checkpoint", type=str, default=None,
         help="從既有 checkpoint 載入權重當起點做 fine-tune (而非從頭訓練)，"
              "例如接著 V2 的權重只針對某個弱點小修時使用；搭配較小的 --lr",
@@ -86,8 +92,11 @@ def main():
 
     n_targeted = int(len(dataset) * args.targeted_ratio)
     if n_targeted > 0:
-        all_datasets.append(ConfusionPairBlocks(length=n_targeted, image_size=args.image_size))
-        dataset_desc.append(f"{n_targeted} (針對性混淆色對)")
+        all_datasets.append(
+            ConfusionPairBlocks(length=n_targeted, image_size=args.image_size, cvd_type=args.targeted_cvd_type)
+        )
+        type_desc = args.targeted_cvd_type or "三類型隨機混合"
+        dataset_desc.append(f"{n_targeted} (針對性混淆色對，{type_desc})")
 
     combined_dataset = ConcatDataset(all_datasets) if len(all_datasets) > 1 else dataset
     dataloader = DataLoader(

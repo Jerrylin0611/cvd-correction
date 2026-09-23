@@ -66,10 +66,27 @@ class SyntheticColorBlocks(Dataset):
 # 訓練時幾乎抽不到「剛好是這個色弱類型會混淆的那一組顏色」，
 # 等於補強的資料量沒有真正打在死角上 (V3/V4 實測純色分數反而變差就是這個原因)。
 # 這裡反過來做：每個色弱類型只配它會混淆的顏色對，資料量雖小但每一筆都有效。
+#
+# tritanopia 的原始配對(已修正)：舊版寫的是「純藍 vs 純黃」「紫 vs 綠」，
+# 這是望文生義「黃藍色弱」這個名稱的誤解 —— tritanopia 是 S 視錐細胞缺陷，
+# 混淆的是「差異主要落在藍-黃對立軸上」的顏色，不是字面上的藍色跟黃色本身。
+# 用 cvd_simulation.simulate_cvd 實際驗證：純藍 vs 純黃模擬後距離仍有原始距離的
+# 67%、紫 vs 綠仍有 60%，根本稱不上「混淆」；相較之下 protanopia/deuteranopia
+# 原本配的紅/綠系配對，模擬後距離降到只剩原始的 26~29%，才是真正的混淆對。
+# 改成用同一套模擬矩陣系統性搜尋出的真實 tritan 混淆對 (模擬後距離降到剩
+# 15~26%)：綠/青、藍/暗綠、藍/藍綠、黃/白、洋紅/橘、紫/灰——這些才是
+# tritanopia 患者實際會分不清的顏色組合 (藍偏向看起來像綠/青，
+# 黃偏向看起來變得偏白/偏粉，紫偏向看起來變灰)。
 _CONFUSION_PAIRS = {
     "protanopia": [((1.0, 0.0, 0.0), (0.0, 1.0, 0.0)), ((0.6, 0.3, 0.0), (0.0, 0.5, 0.0))],
     "deuteranopia": [((1.0, 0.0, 0.0), (0.0, 1.0, 0.0)), ((1.0, 0.5, 0.0), (0.0, 1.0, 0.0))],
-    "tritanopia": [((0.0, 0.0, 1.0), (1.0, 1.0, 0.0)), ((0.5, 0.0, 1.0), (0.0, 1.0, 0.5))],
+    "tritanopia": [
+        ((0.0, 1.0, 0.0), (0.0, 1.0, 1.0)),
+        ((0.0, 0.0, 1.0), (0.0, 0.5, 0.5)),
+        ((1.0, 1.0, 0.0), (1.0, 1.0, 1.0)),
+        ((1.0, 0.0, 1.0), (1.0, 0.5, 0.0)),
+        ((0.56, 0.0, 1.0), (0.5, 0.5, 0.5)),
+    ],
 }
 
 # 以 1x2 (左右對半) 為主，因為這就是 eval 腳本實際測的版面；
@@ -78,18 +95,24 @@ _TARGETED_LAYOUTS = [(1, 2), (1, 2), (1, 2), (2, 1), (2, 2)]
 
 
 class ConfusionPairBlocks(Dataset):
-    """只生成『該色弱類型真正會混淆』的顏色對色塊，資料量小但每筆都打在死角上。"""
+    """只生成『該色弱類型真正會混淆』的顏色對色塊，資料量小但每筆都打在死角上。
 
-    def __init__(self, length: int, image_size: int = 256):
+    cvd_type: 預設 None，每筆隨機挑一種色弱類型 (三種都補)；
+    傳入固定的類型字串 (例如 "tritanopia") 時，只生成該類型的混淆對，
+    用來做「只補強某一種類型、不動其他類型訓練分布」的對照實驗。
+    """
+
+    def __init__(self, length: int, image_size: int = 256, cvd_type: str = None):
         self.length = length
         self.image_size = image_size
+        self.cvd_type = cvd_type
 
     def __len__(self):
         return self.length
 
     def __getitem__(self, idx):
         size = self.image_size
-        cvd_type = random.choice(CVD_TYPES)
+        cvd_type = self.cvd_type or random.choice(CVD_TYPES)
         color_a, color_b = random.choice(_CONFUSION_PAIRS[cvd_type])
         rows, cols = random.choice(_TARGETED_LAYOUTS)
 
