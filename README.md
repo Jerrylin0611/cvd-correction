@@ -93,7 +93,7 @@ project/
     V8（沒看過）PCDM=11.06、LPIPS=0.097，protanopia/deuteranopia 則沒有這種
     落差（V8 甚至持平或略贏）。代表 tritanopia 的顏色校正相對更吃訓練資料量/
     多樣性，泛化能力比另外兩種類型弱，是目前一個真實存在、值得在報告裡揭露
-    的限制，之後可以考慮增加 tritanopia 相關的訓練資料或加強正則化。
+    的限制。後續處理見下方「目前主模型：V9」與「tritanopia（藍黃色弱）的限制」。
 
 ## 目前主模型：V9
 
@@ -117,28 +117,80 @@ demo 都預設用 `src/checkpoints_v9/model_epoch50.pt`。
 - V10（只補 tritanopia 的合成資料）的 tritan 可辨識度比 V8 還差，已排除，
   完整經過見 `_verify_v10_targeted.py` 開頭說明。
 
-## tritanopia 的模擬可信度（Brettel 1997 重評）
+## tritanopia（藍黃色弱）的限制
 
-訓練跟評估用的 Machado 2009 矩陣，原作者明說沒有真正建模 tritanopia，文獻
-（DaltonLens 2021 對開源模擬法的評比）建議 tritan 改用 Brettel, Viénot & Mollon 1997。
-所以在 `cvd_simulation.py` 加上 Brettel 1997 的 tritan 模擬（`set_tritan_model`，
-預設仍是 Machado，訓練不受影響；數值已對 `daltonlens` 參考實作驗證），並用它
-重新評估 held-out 500 張的 tritan 可辨識度（`_verify_brettel_tritan.py`）：
+老師 10/8 問到「藍黃是不是效果最差、有沒有文獻」。整理後的結論分三層：
 
-| tritan 可辨識度改善 | Machado（訓練用） | Brettel（較可信） |
+### 1. 文獻沒有一致認定 tritan 校正效果最差
+
+- 查不到任何文獻直接比較三種類型、並指出 tritan 校正最差。有分類型報結果的研究，
+  結論也不一致：例如一篇用 LMS + ResNet + CycleGAN 的研究 [1]，10 位受試者的
+  辨色正確率是 deutan 71.7%、tritan 59.7%、**protan 46.5% 反而最差**。
+- 比較接近的說法只有質性描述：[2] 指出 tritan 用 color shifting 或 LMS 校正時，
+  「may produce a new confusion」（可能產生新的混淆色）。
+- 真正明確的是 **tritan 被研究得很少**：survey [3] 整理的校正方法幾乎都只針對紅綠
+  色弱；Hue4U [4] 的受試者也以 protan/deutan 為主（兩者佔 CVD 超過 95%）。
+
+所以報告不宜寫「文獻指出藍黃效果最差」，比較準確的說法是「tritan 研究少、
+評估也較不可靠」。
+
+### 2. 常用的 tritan 模擬模型本身不可靠
+
+本專案訓練與評估都用 Machado 2009 [5] 的模擬矩陣，但原作者明說沒有真正建模
+tritanopia，tritan 矩陣只是近似 [6]；Viénot 1999 的方法也不適用 tritan。對開源模擬法
+的評比 [7] 結論是 Brettel, Viénot & Mollon 1997 [8] 是 tritan「basically only valid
+choice」。因為我們的 loss 和可辨識度評估都依賴模擬，**tritan 的數字可信度本來就
+比 protan/deutan 低**。
+
+### 3. 用較可信的 Brettel 1997 重新評估（換尺，不換模型）
+
+在 `cvd_simulation.py` 加上 Brettel 1997 的 tritan 模擬（`set_tritan_model`，預設仍是
+Machado，訓練不受影響；數值已對 `daltonlens` 參考實作驗證）。**模型沒有重訓**，
+只是把「評分時模擬藍黃色盲看到的畫面」換成 Brettel，重新量 held-out 500 張的
+tritan 可辨識度（`_verify_brettel_tritan.py`）：
+
+| tritan 可辨識度改善 | 用 Machado 量（訓練用） | 用 Brettel 量（較可信） |
 |---|---|---|
 | V8 distinguish / palette | +70.1% / +83.2% | +55.2% / +54.8% |
 | V9 distinguish / palette | +64.4% / +73.1% | +55.0% / +54.2% |
 
-- 換成較可信的模擬，**校正效果仍在**（約 +55%），代表模型學到的 tritan 校正是真的，
-  不只是對某個特定模擬矩陣有效。
-- 但改善幅度比用 Machado 量時小 15~30 個百分點：模型有一部分是在「迎合」訓練用的
-  Machado 矩陣，用 Machado 報的 tritan 數字會高估效果。
-- 在 Brettel 下 **V8 跟 V9 幾乎一樣**，V9 在 tritan 可辨識度上的「代價」只在 Machado
-  下才看得到，更支持以 V9 為主模型。
-- 只影響可辨識度：`eval_metrics.py` 的 SSIM/LPIPS/PCDM 是「原圖 vs 校正後」，
-  不經過色弱模擬，換模擬模型不會改變。
-- 兩種模擬對同一張原圖的 tritan 結果平均差 ΔE2000 = 3.25，屬於肉眼可察覺的落差。
+- **校正效果是真的**：換一個模型訓練時沒見過的模擬來量，仍改善約 55%，
+  不是只對 Machado 矩陣有效的假象。
+- **但用 Machado 報的 tritan 數字會高估**：換成 Brettel 後少了 15~30 個百分點，
+  模型有一部分是在「迎合」訓練用的模擬矩陣。報告裡 tritan 的結果兩種都列。
+- **Brettel 下 V8 與 V9 幾乎一樣**：V9 在 tritan 可辨識度上的代價只在 Machado 下
+  看得到，更支持以 V9 為主模型。
+- 兩種模擬對同一張原圖的 tritan 結果平均差 ΔE2000 = 3.25，屬肉眼可察覺的落差，
+  選哪個模擬模型不是小細節。
+
+### 仍存在的限制與後續
+
+- 換模擬只影響可辨識度。保真度指標（SSIM/LPIPS/PCDM）比的是「原圖 vs 校正後」，
+  不經過模擬，所以 V8 的 tritan PCDM 偏高（11.06）無法用模擬不準來解釋。
+- Brettel 本身也只是「較可信的近似」，沒有針對 tritan 受試者驗證過的模擬模型；
+  要真正確認效果仍需 tritan 受試者實測，但 tritan 盛行率低，受試者難找。
+- 可能的改善：用 Brettel 當 tritan 的訓練 loss 重訓（V11），讓模型針對較準的模擬
+  校正，而不是迎合 Machado。尚未執行。
+
+### 參考文獻
+
+1. A. P. Adyani, *Koreksi Warna Pada Citra untuk Penderita Buta Warna Menggunakan
+   Representasi Warna LMS dan CNN*, 學士論文, UPN Veteran Jawa Timur.
+   https://repository.upnjatim.ac.id/39265/
+2. *Smartphone Based Image Color Correction for Color Blindness*, Int. J. Interactive
+   Mobile Technologies (iJIM), 2018. https://online-journals.org/index.php/i-jim/article/view/8160
+3. Z. Zhu, X. Mao, "Image recoloring for color vision deficiency compensation: a survey,"
+   *The Visual Computer*, 2021. https://doi.org/10.1007/s00371-021-02240-0
+4. J. Qin et al., "Hue4U: Real-Time Personalized Color Correction in Augmented Reality,"
+   arXiv:2509.06776, 2025.
+5. G. M. Machado, M. M. Oliveira, L. A. F. Fernandes, "A Physiologically-based Model for
+   Simulation of Color Vision Deficiency," *IEEE TVCG* 15(6), 2009.
+6. colour-science, `colour.blindness.machado2009` 文件說明.
+   https://colour.readthedocs.io/en/latest/_modules/colour/blindness/machado2009.html
+7. DaltonLens, "Review of Open Source Color Blindness Simulations," 2021.
+   https://daltonlens.org/opensource-cvd-simulation/
+8. H. Brettel, F. Viénot, J. D. Mollon, "Computerized simulation of color appearance for
+   dichromats," *JOSA A* 14(10), 1997.
 
 ## 使用方式
 
