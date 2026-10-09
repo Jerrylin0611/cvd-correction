@@ -95,6 +95,28 @@ project/
     多樣性，泛化能力比另外兩種類型弱，是目前一個真實存在、值得在報告裡揭露
     的限制，之後可以考慮增加 tritanopia 相關的訓練資料或加強正則化。
 
+## 目前主模型：V9
+
+跟老師討論後（2026-10-08）決定**以 V9 為主模型**，V8 當對照組。之後新的評估、
+demo 都預設用 `src/checkpoints_v9/model_epoch50.pt`。
+
+- **V9 = V8 + 針對性混淆色對合成資料**（`--targeted_ratio 0.15`，三種色弱類型
+  隨機混合，見 `synthetic_colors.ConfusionPairBlocks`）。
+- **選 V9 的理由**：三種色弱類型的保真度最平均。V8 在 tritanopia 上明顯失真，
+  V9 把它拉回跟另外兩種類型同一個水準（held-out 500 張，`metrics_summary.csv`）：
+
+  | PCDM（越低越好） | protanopia | deuteranopia | tritanopia |
+  |---|---|---|---|
+  | V8 | 5.25 | 4.96 | **11.06** |
+  | V9 | 7.80 | 7.52 | **7.14** |
+
+- **代價（報告裡要揭露）**：V9 的 protan/deuter 保真度比 V8 差一些（PCDM 約
+  5→7.5），可辨識度改善幅度也比 V8 小（例如 tritanopia distinguish 改善 V8
+  70.1% → V9 64.3%，protanopia 67.8% → 62.7%，見 `_verify_v10_targeted.py`）。
+  也就是 V9 用「三種類型校正力道都稍微收斂」換取「tritanopia 不會特別差」。
+- V10（只補 tritanopia 的合成資料）的 tritan 可辨識度比 V8 還差，已排除，
+  完整經過見 `_verify_v10_targeted.py` 開頭說明。
+
 ## 使用方式
 
 安裝套件：
@@ -105,13 +127,14 @@ pip install -r requirements.txt
 訓練：
 ```
 cd src
-python train.py --data_dir "../data/val2017" --epochs 30 --batch_size 8
+python train.py --data_dir "../data/val2017" --epochs 50 --batch_size 8 --targeted_ratio 0.15 --checkpoint_dir checkpoints_v9
 ```
+（上面是主模型 V9 的設定；拿掉 `--targeted_ratio 0.15` 就是對照組 V8。）
 
 影像品質指標評估（SSIM / MS-SSIM / CW-SSIM / LPIPS / PCDM，用來跟其他方法比較）：
 ```
 cd src
-python eval_metrics.py --checkpoint checkpoints_v7/model_epoch50.pt --tag v7
+python eval_metrics.py --checkpoint checkpoints_v9/model_epoch50.pt --tag v9
 ```
 預設三種色弱類型都算；每張圖的結果在 `metrics_results/`（不進版控），各版本平均值累加到
 `metrics_summary.csv`。這些指標量的是「校正後跟原圖有多像」（保真度），不是校正效果；
@@ -121,8 +144,10 @@ python eval_metrics.py --checkpoint checkpoints_v7/model_epoch50.pt --tag v7
 即時 webcam demo（訓練完成後）：
 ```
 cd src
-python webcam_demo.py --checkpoint checkpoints/model_epoch30.pt
+python webcam_demo.py
 ```
+預設載入主模型 `checkpoints_v9/model_epoch50.pt`；要看其他版本加 `--checkpoint`，
+例如 `--checkpoint checkpoints_v8/model_epoch50.pt`。
 鍵盤操作：`1`/`2`/`3` 切換色弱類型（protanopia/deuteranopia/tritanopia），`q` 離開。
 畫面會並排顯示：原始畫面 / 校正前的色弱模擬 / 校正後的色弱模擬，方便直接比較效果。
 

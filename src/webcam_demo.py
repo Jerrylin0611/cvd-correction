@@ -2,7 +2,8 @@
 即時 webcam Demo。
 
 用法:
-    python webcam_demo.py --checkpoint ./checkpoints/model_epoch30.pt
+    python webcam_demo.py                       # 預設用主模型 V9
+    python webcam_demo.py --checkpoint checkpoints_v8/model_epoch50.pt   # 換其他版本對照
 
 畫面會並排顯示三種畫面，方便老師/評審直接比較效果:
   [原始畫面] [色弱模擬(校正前)] [色弱模擬(校正後)]
@@ -31,7 +32,9 @@ from model import LightUNetColorCorrector
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--checkpoint", type=str, required=True)
+    # 預設主模型 V9：三種色弱類型的保真度最平均 (tritanopia 不會像 V8 那樣明顯失真)，
+    # 跟老師討論後 (2026-10-08) 決定以 V9 為主，V8 當對照，見 README「目前主模型」
+    parser.add_argument("--checkpoint", type=str, default="checkpoints_v9/model_epoch50.pt")
     parser.add_argument("--camera_id", type=int, default=0)
     parser.add_argument("--infer_size", type=int, default=256, help="送進模型的解析度，越小越快")
     return parser.parse_args()
