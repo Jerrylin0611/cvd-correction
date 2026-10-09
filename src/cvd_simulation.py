@@ -10,6 +10,12 @@
 這是目前色覺模擬最常被引用、也是 Hue4U 等最新論文採用的生理模型之一。
 矩陣是在「線性 RGB」空間下運作的，所以流程一定是：
 sRGB (一般圖片) -> 線性 RGB -> 套用矩陣模擬色盲 -> 轉回 sRGB。
+
+注意 tritanopia：Machado 2009 原作者明說沒有真正去建模 tritanopia (只是 tritanomaly 的
+shift 近似)，文獻 (DaltonLens 2021 對開源模擬法的評比) 建議 tritan 改用
+Brettel, Viénot & Mollon (1997)。所以另外提供 Brettel 1997 的 tritan 模擬，
+用 set_tritan_model("brettel1997") 切換。預設仍是 Machado，訓練行為不變；
+目前只拿 Brettel 來「換一個比較可信的模擬重新評估」，見 _verify_brettel_tritan.py。
 """
 
 import torch
@@ -33,6 +39,50 @@ _CVD_MATRICES = {
         [0.004733, 0.691367, 0.303900],
     ]),
 }
+
+# Brettel, Viénot & Mollon (1997) 的 tritanopia 模擬：在 LMS 空間把顏色投影到兩個
+# 半平面 (以 485nm / 660nm 為錨點) 之一，所以是「兩個矩陣 + 依顏色落在哪一側挑一個」。
+# 下面數值是用 daltonlens 0.1.5 的 Simulator_Brettel1997 (sRGB, Smith & Pokorny 1975
+# 錐細胞基礎、以 RGB 白當中性軸) 換算成「線性 RGB -> 線性 RGB」的形式，
+# 對隨機圖片跟 daltonlens 的結果誤差 < 1e-14，白色模擬後仍是白色。
+_BRETTEL_TRITAN_M1 = torch.tensor([
+    [1.013542, 0.142682, -0.156224],
+    [-0.011805, 0.875612, 0.136194],
+    [0.077073, 0.812081, 0.110847],
+])
+_BRETTEL_TRITAN_M2 = torch.tensor([
+    [0.933370, 0.199990, -0.133360],
+    [0.058087, 0.825652, 0.116261],
+    [-0.379228, 1.138250, 0.240978],
+])
+# 分隔平面的法向量 (已換算到線性 RGB)：dot(rgb, n) < 0 用 M2，否則用 M1
+_BRETTEL_TRITAN_SEP = torch.tensor([0.039601, -0.028307, -0.011294])
+
+TRITAN_MODELS = ["machado2009", "brettel1997"]
+_tritan_model = "machado2009"
+
+
+def set_tritan_model(name: str) -> None:
+    """切換 tritanopia 要用哪個模擬模型 (影響 simulate_cvd / simulate_cvd_per_sample，
+    也就連帶影響 losses.py 的 distinguish/palette)。只有 tritanopia 受影響。"""
+    global _tritan_model
+    if name not in TRITAN_MODELS:
+        raise ValueError(f"tritan 模擬模型只支援 {TRITAN_MODELS}，收到 {name}")
+    _tritan_model = name
+
+
+def _brettel_tritan_linear(linear: torch.Tensor) -> torch.Tensor:
+    """線性 RGB (B,3,H,W) -> Brettel 1997 tritanopia 模擬 (線性 RGB，尚未 clamp)。"""
+    m1 = _BRETTEL_TRITAN_M1.to(linear.device, linear.dtype)
+    m2 = _BRETTEL_TRITAN_M2.to(linear.device, linear.dtype)
+    sep = _BRETTEL_TRITAN_SEP.to(linear.device, linear.dtype)
+    use_m2 = torch.einsum("c,bchw->bhw", sep, linear).unsqueeze(1) < 0
+    return torch.where(
+        use_m2,
+        torch.einsum("oc,bchw->bohw", m2, linear),
+        torch.einsum("oc,bchw->bohw", m1, linear),
+    )
+
 
 # 給模型當「條件輸入」用的固定順序，方便用 index 表示色弱類型
 CVD_TYPES = list(_CVD_MATRICES.keys())
@@ -72,11 +122,13 @@ def simulate_cvd(img: torch.Tensor, cvd_type: str) -> torch.Tensor:
     cvd_type: "protanopia" / "deuteranopia" / "tritanopia" 其中一種
     回傳: 同樣 shape，模擬後的 sRGB 圖片
     """
-    matrix = _CVD_MATRICES[cvd_type].to(img.device, img.dtype)
-
     linear = srgb_to_linear(img)
-    # 用 einsum 把矩陣套用在 channel 維度上 (B,3,H,W) -> (B,3,H,W)
-    simulated_linear = torch.einsum("oc,bchw->bohw", matrix, linear)
+    if cvd_type == "tritanopia" and _tritan_model == "brettel1997":
+        simulated_linear = _brettel_tritan_linear(linear)
+    else:
+        matrix = _CVD_MATRICES[cvd_type].to(img.device, img.dtype)
+        # 用 einsum 把矩陣套用在 channel 維度上 (B,3,H,W) -> (B,3,H,W)
+        simulated_linear = torch.einsum("oc,bchw->bohw", matrix, linear)
     simulated_linear = torch.clamp(simulated_linear, 0.0, 1.0)
 
     return linear_to_srgb(simulated_linear)
@@ -96,6 +148,10 @@ def simulate_cvd_per_sample(img: torch.Tensor, cvd_type_idx: torch.Tensor) -> to
 
     linear = srgb_to_linear(img)
     simulated_linear = torch.einsum("boc,bchw->bohw", matrices, linear)
+    if _tritan_model == "brettel1997":
+        is_tritan = (cvd_type_idx == CVD_TYPES.index("tritanopia")).view(-1, 1, 1, 1)
+        if is_tritan.any():
+            simulated_linear = torch.where(is_tritan, _brettel_tritan_linear(linear), simulated_linear)
     simulated_linear = torch.clamp(simulated_linear, 0.0, 1.0)
 
     return linear_to_srgb(simulated_linear)

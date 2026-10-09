@@ -117,6 +117,29 @@ demo 都預設用 `src/checkpoints_v9/model_epoch50.pt`。
 - V10（只補 tritanopia 的合成資料）的 tritan 可辨識度比 V8 還差，已排除，
   完整經過見 `_verify_v10_targeted.py` 開頭說明。
 
+## tritanopia 的模擬可信度（Brettel 1997 重評）
+
+訓練跟評估用的 Machado 2009 矩陣，原作者明說沒有真正建模 tritanopia，文獻
+（DaltonLens 2021 對開源模擬法的評比）建議 tritan 改用 Brettel, Viénot & Mollon 1997。
+所以在 `cvd_simulation.py` 加上 Brettel 1997 的 tritan 模擬（`set_tritan_model`，
+預設仍是 Machado，訓練不受影響；數值已對 `daltonlens` 參考實作驗證），並用它
+重新評估 held-out 500 張的 tritan 可辨識度（`_verify_brettel_tritan.py`）：
+
+| tritan 可辨識度改善 | Machado（訓練用） | Brettel（較可信） |
+|---|---|---|
+| V8 distinguish / palette | +70.1% / +83.2% | +55.2% / +54.8% |
+| V9 distinguish / palette | +64.4% / +73.1% | +55.0% / +54.2% |
+
+- 換成較可信的模擬，**校正效果仍在**（約 +55%），代表模型學到的 tritan 校正是真的，
+  不只是對某個特定模擬矩陣有效。
+- 但改善幅度比用 Machado 量時小 15~30 個百分點：模型有一部分是在「迎合」訓練用的
+  Machado 矩陣，用 Machado 報的 tritan 數字會高估效果。
+- 在 Brettel 下 **V8 跟 V9 幾乎一樣**，V9 在 tritan 可辨識度上的「代價」只在 Machado
+  下才看得到，更支持以 V9 為主模型。
+- 只影響可辨識度：`eval_metrics.py` 的 SSIM/LPIPS/PCDM 是「原圖 vs 校正後」，
+  不經過色弱模擬，換模擬模型不會改變。
+- 兩種模擬對同一張原圖的 tritan 結果平均差 ΔE2000 = 3.25，屬於肉眼可察覺的落差。
+
 ## 使用方式
 
 安裝套件：
