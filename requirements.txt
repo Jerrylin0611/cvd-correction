@@ -8,3 +8,4 @@ scikit-image
 lpips
 pyrtools
 scipy
+piq

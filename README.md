@@ -33,6 +33,7 @@ project/
     ├── train.py            # 訓練腳本
     ├── eval_checkpoint.py  # 色弱可辨識度評估，結果累加到 results.csv
     ├── eval_metrics.py     # SSIM/MS-SSIM/CW-SSIM/LPIPS/PCDM 評估，結果累加到 metrics_summary.csv
+    ├── eval_literature_metrics.py  # 文獻指標 GCD/GCE/LCE/CD/FSIMc，結果累加到 literature_metrics_summary.csv
     └── webcam_demo.py      # 即時 webcam demo
 ```
 
@@ -276,6 +277,114 @@ Kodak 24 張上推論，不重訓**。Kodak 是不同相機、不同題材的高
 - **限制**：Kodak 只有 24 張，統計誤差大（例如 V9 tritan PCDM 9.11 ± 2.56，平均值的
   標準誤約 0.5）；也還沒做多 seed 重訓，數字是單一模型的結果。
 
+## 指標的文獻依據與文獻指標評估
+
+回應老師 10/8 第 2 點（指標需要文獻驗證）。
+
+### 1. 現有保真度指標的出處
+
+| 指標 | 出處 | 在綜述中的角色 |
+|---|---|---|
+| SSIM | Wang et al. 2004 [S1] | 綜述列為自然度指標 |
+| MS-SSIM | Wang, Simoncelli, Bovik 2003 [S2] | — |
+| CW-SSIM | Sampat et al. 2009 [S3] | — |
+| LPIPS | Zhang et al. 2018 [S4] | — |
+| PCDM（CIEDE2000 平均） | Luo, Cui, Rigg 2001 [S5]；實作依 Sharma et al. 2005 [S6] | 綜述的 CD 指標同一類（CD 用 CIELAB 歐氏距離） |
+| colorfulness（Kodak 段落用） | Hasler & Süsstrunk 2003 [S7] | — |
+
+MS-SSIM、CW-SSIM、LPIPS 是通用的影像品質指標，CVD 校正文獻比較少用。綜述
+（Zhu & Mao 2021，上一節參考文獻 3）第 3.2 節整理的 dichromacy 校正常用量化指標是：
+對比用 GCD / GCE / LCE，自然度用 CD / SSIM / FSIMc。
+
+### 2. 自創指標的問題，以及改用文獻指標
+
+distinguish / palette 是我們自己定義的，**同時也是訓練 loss**，拿來評估等於
+球員兼裁判。`eval_literature_metrics.py` 依綜述的公式實作了文獻指標（全部在
+CIELAB 上算，對比指標都經過色弱模擬）：
+
+- **GCD**（Ma et al. 2008 [S8]；Chen et al. 2011 [S9]）：色弱者看到的全域對比強度，
+  越高越好。這裡報「補回 %」=（校正後 − 不校正）/（原圖正常視覺 − 不校正），
+  也就是色弱損失掉的對比補回幾成。
+- **GCE**（Huang et al. 2007 [S10]；Hassan 2019 [S11]）：顏色對之間的對比跟原圖
+  不一致的程度，越低越好。概念對應我們的 palette。
+- **LCE**（Machado & Oliveira 2010 [S12]；Zhu et al. 2019 [S13]；Wang et al. 2021 [S14]）：
+  像素跟鄰居的局部對比跟原圖不一致的程度，越低越好。概念對應我們的 distinguish。
+- **CD**、**FSIMc**（Zhang et al. 2011 [S15]，用 piq 套件）：自然度。
+
+GCE / LCE 是「對比要跟原圖一致」，對比不夠或太強都會扣分；GCD 只看夠不夠強。
+綜述沒規定的細節（GCE/GCD 每張圖抽 512 個像素、LCE 在 15x15 鄰域抽 8 個鄰居）是我們
+自己選的，寫在腳本開頭。綜述表 3~6 是在他們自己的 6 張圖上算的，**數字不能直接對照**。
+
+**結果（V9；括號是 V8；改善 % 都是相對不校正）**
+
+| | GCD 補回 ↑ | GCE 改善 ↑ | LCE 改善 ↑ | CD ↓ | FSIMc ↑ |
+|---|---|---|---|---|---|
+| protan COCO test | 56.0% (47.4%) | +7.1% (+8.4%) | −19.2% (−7.9%) | 8.67 (6.44) | 0.987 (0.990) |
+| protan Kodak | 36.3% (32.1%) | +35.1% (+34.9%) | +16.3% (+12.1%) | 9.46 (7.32) | 0.985 (0.987) |
+| deutan COCO test | 51.6% (47.7%) | −14.1% (−14.2%) | −32.9% (−26.7%) | 8.23 (5.84) | 0.990 (0.994) |
+| deutan Kodak | 36.3% (35.3%) | +22.9% (+25.3%) | −8.2% (−2.4%) | 9.55 (8.04) | 0.987 (0.990) |
+| tritan Brettel COCO test | 5.2% (10.4%) | +4.7% (+9.0%) | −7.1% (−14.3%) | 8.24 (12.71) | 0.989 (0.981) |
+| tritan Brettel Kodak | −7.7% (−7.1%) | −7.9% (−12.8%) | −22.6% (−30.4%) | 9.91 (14.58) | 0.988 (0.974) |
+
+（tritan Machado 和逐項數字見 `literature_metrics_summary.csv`。）
+
+**結論：用文獻指標看，校正效果比自創指標顯示的小很多。**
+
+- **紅綠色弱（protan/deutan）有效，但只補回一部分**：GCD 顯示色弱者損失的全域對比
+  補回 32~56%。這跟「影像量化」一節混淆色對的大幅改善一致，只是在一般照片上被稀釋了。
+- **但對比的「位置」沒有對準原圖**：LCE 大多變差，GCE 時好時壞。拆開來看（診斷時
+  另外算的，COCO test 96 張），不校正時誤差幾乎全是「對比不夠」（過強的部分 < 6%），
+  校正後有 10~49% 的誤差來自「對比比原圖還強」。也就是模型把對比補回來了，但會在
+  原本沒有對比的地方加出新的對比，補的位置也不完全對。
+- **自創指標偏樂觀的原因是色彩空間跟尺度**：distinguish / palette 是在 sRGB 上算，
+  而且主要的改善來自縮小 4 倍、16 倍後的粗尺度。同樣的「像素對距離誤差」，在 sRGB 上算
+  （15x15 鄰域）protan V9 改善 +16.6%，換到 Lab 上就變成 −25.9%；在像素尺度
+  （3x3 鄰域）兩種空間都變差。模型最佳化的是 sRGB 上的粗尺度對比，換成感知均勻的
+  CIELAB 來看，效果就沒那麼好。
+- **tritan 效果最弱**：GCD 只補回 5~30%（COCO），在 Kodak 上甚至略低於不校正。
+  這跟前面「tritan 改善幅度最小」的結論一致，而且比自創指標顯示的更差。
+- **自創指標跟文獻指標的方向一致，但只是中度相關**：把每張圖的數值放在一起看，
+  distinguish~LCE 的 Spearman 為 0.34~0.74、palette~GCE 為 0.44~0.72。相關性大多來自
+  「圖本身難不難」，不足以證明自創指標可以取代文獻指標。
+- **後續建議**：報告的主要數字應改用 GCD / LCE / CD / FSIMc，自創指標只當輔助。
+  如果要改善模型，訓練 loss 可以改在 CIELAB 上算、並加強像素尺度的權重（要重訓）。
+
+### 參考文獻（指標）
+
+- [S1] Z. Wang, A. C. Bovik, H. R. Sheikh, E. P. Simoncelli, "Image quality assessment: from
+  error visibility to structural similarity," *IEEE TIP* 13(4), 600–612, 2004.
+- [S2] Z. Wang, E. P. Simoncelli, A. C. Bovik, "Multiscale structural similarity for image
+  quality assessment," *Asilomar Conf. Signals, Systems & Computers*, 2003.
+- [S3] M. P. Sampat, Z. Wang, S. Gupta, A. C. Bovik, M. K. Markey, "Complex wavelet structural
+  similarity: a new image similarity index," *IEEE TIP* 18(11), 2385–2401, 2009.
+- [S4] R. Zhang, P. Isola, A. A. Efros, E. Shechtman, O. Wang, "The unreasonable effectiveness
+  of deep features as a perceptual metric," *CVPR*, 2018.
+- [S5] M. R. Luo, G. Cui, B. Rigg, "The development of the CIE 2000 colour-difference formula:
+  CIEDE2000," *Color Research & Application* 26(5), 340–350, 2001.
+- [S6] G. Sharma, W. Wu, E. N. Dalal, "The CIEDE2000 color-difference formula: implementation
+  notes, supplementary test data, and mathematical observations," *Color Research &
+  Application* 30(1), 21–30, 2005.
+- [S7] D. Hasler, S. Süsstrunk, "Measuring colourfulness in natural images," *Proc. SPIE*
+  5007, Human Vision and Electronic Imaging VIII, 2003.
+- [S8] Y. Ma, X. Gu, Y. Wang, "Color discrimination enhancement for dichromats using
+  self-organizing color transformation," *Information Sciences* 179(6), 830–843, 2008.
+- [S9] W. Chen, W. Chen, H. Bao, "An efficient direct volume rendering approach for
+  dichromats," *IEEE TVCG* 17(12), 2144–2152, 2011.
+- [S10] J.-B. Huang, Y.-C. Tseng, S.-I. Wu, S.-J. Wang, "Information preserving color
+  transformation for protanopia and deuteranopia," *IEEE Signal Processing Letters* 14(10),
+  711–714, 2007.
+- [S11] M. Hassan, "Flexible color contrast enhancement method for red-green deficiency,"
+  *Multidimensional Systems and Signal Processing* 30(4), 1975–1989, 2019.
+- [S12] G. M. Machado, M. M. Oliveira, "Real-time temporal-coherent color contrast enhancement
+  for dichromats," *Computer Graphics Forum* 29(3), 933–942, 2010.
+- [S13] Z. Zhu, M. Toyoura, K. Go, I. Fujishiro, K. Kashiwagi, X. Mao, "Naturalness- and
+  information-preserving image recoloring for red–green dichromats," *Signal Processing:
+  Image Communication* 76, 68–80, 2019.
+- [S14] X. Wang, Z. Zhu, X. Chen, K. Go, M. Toyoura, X. Mao, "Fast contrast and naturalness
+  preserving image recolouring for dichromats," *Computers & Graphics* 98, 19–28, 2021.
+- [S15] L. Zhang, L. Zhang, X. Mou, D. Zhang, "FSIM: a feature similarity index for image
+  quality assessment," *IEEE TIP* 20(8), 2378–2386, 2011.
+
 ## 使用方式
 
 安裝套件：
@@ -299,6 +408,13 @@ python eval_metrics.py --checkpoint checkpoints_v9/model_epoch50.pt --tag v9
 `metrics_summary.csv`。這些指標量的是「校正後跟原圖有多像」（保真度），不是校正效果；
 跟其他方法比較時，資料集、圖片大小(256x256)、色弱類型都要對齊。CW-SSIM 用標準的 7x7
 局部視窗版（灰階），跟論文報的數值才有可比性。
+
+文獻上的 CVD 校正指標（GCD / GCE / LCE / CD / FSIMc，見「指標的文獻依據」一節；
+COCO test 跟 Kodak 都算，Kodak 要先下載到 `data/kodak/`）：
+```
+cd src
+python eval_literature_metrics.py
+```
 
 即時 webcam demo（訓練完成後）：
 ```
