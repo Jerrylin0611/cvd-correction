@@ -23,7 +23,8 @@
 project/
 ├── requirements.txt
 ├── data/
-│   └── val2017/          # 訓練圖片 (COCO val2017, 5000張日常場景照片)
+│   ├── val2017/          # 訓練圖片 (COCO val2017, 5000張日常場景照片)
+│   └── kodak/            # 跨資料集測試用 (Kodak 24 張，只推論不訓練)
 └── src/
     ├── cvd_simulation.py  # 色弱視覺模擬 (Machado et al. 2009 矩陣)
     ├── model.py           # 輕量 U-Net 架構
@@ -231,6 +232,49 @@ tritan 可辨識度（`_verify_brettel_tritan.py`）：
 - **tritan（Machado）沒有結果**：用 Machado 的 tritan 模擬，排除訓練色後找不到任何
   符合條件的混淆色對。Machado 的 tritan 模擬太弱，強混淆色幾乎都集中在訓練用過的
   那幾組，又一次說明它不適合用來評估 tritan（見上一節）。
+
+## 跨資料集泛化：Kodak 24 張
+
+回應老師 10/8 第 1 點（交叉比對泛化能力）。V8 的 held-out 驗證只是 COCO 內部切分，
+test 跟 train 分布很接近；這裡把在 COCO 訓練的 V9（主模型）/ V8（對照）**直接拿到
+Kodak 24 張上推論，不重訓**。Kodak 是不同相機、不同題材的高畫質照片（需自行下載到
+`data/kodak/`，不進版控，來源 `https://r0k.us/graphics/kodak/`）。可辨識度見
+`_eval_kodak.py`，保真度用 `eval_metrics.py --data_dir ../data/kodak --split all`
+（tag `kodak_v9` / `kodak_v8`，結果在 `metrics_summary.csv`）。兩邊都直接 resize 成
+256x256，前處理一致。
+
+**可辨識度：相對不校正的改善 %（distinguish / palette，越高越好）**
+
+| 類型 | V9 COCO test | V9 Kodak | V8 COCO test | V8 Kodak |
+|---|---|---|---|---|
+| protan | 61.6 / 73.3 | 59.1 / 68.7 | 66.4 / 78.3 | 63.6 / 72.4 |
+| deutan | 43.0 / 55.7 | 44.8 / 54.4 | 48.4 / 64.5 | 49.0 / 60.8 |
+| tritan（Machado） | 63.4 / 73.5 | 65.5 / 73.4 | 69.1 / 83.6 | 66.4 / 76.1 |
+| tritan（Brettel） | 54.1 / 55.2 | 55.1 / 48.1 | 54.3 / 55.6 | 57.0 / 49.2 |
+
+**保真度（原圖 vs 校正後，PCDM = CIEDE2000 平均，越低越自然；LPIPS 越低越好）**
+
+| 類型 | V9 COCO test | V9 Kodak | V8 COCO test | V8 Kodak |
+|---|---|---|---|---|
+| protan PCDM / LPIPS | 7.80 / 0.069 | 9.05 / 0.096 | 5.25 / 0.047 | 6.03 / 0.068 |
+| deutan PCDM / LPIPS | 7.52 / 0.060 | 9.42 / 0.091 | 4.96 / 0.036 | 7.33 / 0.065 |
+| tritan PCDM / LPIPS | 7.14 / 0.056 | 9.11 / 0.074 | 11.06 / 0.097 | 14.06 / 0.127 |
+
+（SSIM / MS-SSIM / CW-SSIM 在兩個資料集都在 0.96~0.995，差異小，完整數字見 `metrics_summary.csv`。）
+
+- **校正效果可以泛化到別的資料集**：可辨識度改善在 Kodak 上跟 COCO test 差不多，
+  distinguish 差在 ±3 個百分點內（有幾格 Kodak 反而比較好）。掉得比較多的是 palette
+  （大範圍色塊間的對比）：protan 掉 4.6~5.9、Brettel tritan 掉 6.4~7.1、V8 tritan（Machado）
+  掉 7.5 個百分點，但改善幅度仍有約 50% 以上。
+- **保真度在 Kodak 上全面變差一些**：PCDM 高 1~3、LPIPS 高 0.02~0.03，代表模型在
+  Kodak 上改色改得比較多。這不是少數幾張圖拉高的（V9 tritan PCDM 中位數 COCO 6.5 →
+  Kodak 9.4），也**不是**因為 Kodak 比較鮮豔（Hasler–Süsstrunk colorfulness：COCO
+  40.6、Kodak 39.3，幾乎一樣）。確切原因還沒查清楚。
+- **V9 vs V8 的取捨在 Kodak 上維持一樣**：V8 可辨識度略高、但 protan/deutan 改得更多；
+  tritan 則是 V9 自然很多（PCDM 9.1 vs 14.1），而 Brettel 下兩者可辨識度相當，
+  再次支持以 V9 為主模型。
+- **限制**：Kodak 只有 24 張，統計誤差大（例如 V9 tritan PCDM 9.11 ± 2.56，平均值的
+  標準誤約 0.5）；也還沒做多 seed 重訓，數字是單一模型的結果。
 
 ## 使用方式
 
