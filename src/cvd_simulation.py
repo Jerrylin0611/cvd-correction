@@ -114,6 +114,24 @@ def linear_to_srgb(img: torch.Tensor) -> torch.Tensor:
     return torch.where(img <= threshold, low, high)
 
 
+# sRGB(D65) -> XYZ
+_RGB2XYZ = torch.tensor([
+    [0.4124564, 0.3575761, 0.1804375],
+    [0.2126729, 0.7151522, 0.0721750],
+    [0.0193339, 0.1191920, 0.9503041],
+])
+_WHITE = torch.tensor([0.95047, 1.0, 1.08883])
+
+
+def rgb_to_lab(img):
+    """(B,3,H,W) sRGB 0~1 -> CIELAB (B,3,H,W)，D65。eval_literature_metrics 跟 V11 的 Lab loss 共用。"""
+    xyz = torch.einsum("ij,bjhw->bihw", _RGB2XYZ.to(img.device), srgb_to_linear(img.clamp(0, 1)))
+    xyz = xyz / _WHITE.to(img.device).view(1, 3, 1, 1)
+    d = 6 / 29
+    f = torch.where(xyz > d ** 3, xyz.clamp(min=1e-12) ** (1 / 3), xyz / (3 * d ** 2) + 4 / 29)
+    return torch.stack([116 * f[:, 1] - 16, 500 * (f[:, 0] - f[:, 1]), 200 * (f[:, 1] - f[:, 2])], 1)
+
+
 def simulate_cvd(img: torch.Tensor, cvd_type: str) -> torch.Tensor:
     """
     模擬色弱患者看到的畫面。

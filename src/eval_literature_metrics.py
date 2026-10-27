@@ -52,7 +52,7 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
 
 import cvd_simulation
-from cvd_simulation import CVD_TYPES, simulate_cvd, srgb_to_linear
+from cvd_simulation import CVD_TYPES, rgb_to_lab, simulate_cvd
 from dataset import split_image_paths
 from losses import distinguishability_loss, palette_distance_loss
 from model import LightUNetColorCorrector
@@ -75,24 +75,6 @@ LCE_RADIUS = 7
 LCE_NORM = 160.0
 SEED = 0
 SUMMARY_FILE = Path("../literature_metrics_summary.csv")
-
-# sRGB(D65) -> XYZ
-_RGB2XYZ = torch.tensor([
-    [0.4124564, 0.3575761, 0.1804375],
-    [0.2126729, 0.7151522, 0.0721750],
-    [0.0193339, 0.1191920, 0.9503041],
-])
-_WHITE = torch.tensor([0.95047, 1.0, 1.08883])
-
-
-def rgb_to_lab(img):
-    """(B,3,H,W) sRGB 0~1 -> CIELAB (B,3,H,W)，D65。"""
-    xyz = torch.einsum("ij,bjhw->bihw", _RGB2XYZ.to(img.device), srgb_to_linear(img.clamp(0, 1)))
-    xyz = xyz / _WHITE.to(img.device).view(1, 3, 1, 1)
-    d = 6 / 29
-    f = torch.where(xyz > d ** 3, xyz.clamp(min=1e-12) ** (1 / 3), xyz / (3 * d ** 2) + 4 / 29)
-    return torch.stack([116 * f[:, 1] - 16, 500 * (f[:, 0] - f[:, 1]), 200 * (f[:, 1] - f[:, 2])], 1)
-
 
 def gcd(lab, idx):
     """每張圖一個值：抽樣像素的所有顏色對，CIELAB 距離平均。"""

@@ -46,6 +46,19 @@ def parse_args():
     parser.add_argument("--w_distinguish", type=float, default=10.0, help="可辨識度(邊緣型) loss 權重")
     parser.add_argument("--w_palette", type=float, default=10.0, help="可辨識度(調色盤型) loss 權重，補強大面積色塊")
     parser.add_argument("--w_bias", type=float, default=5.0, help="整體色偏懲罰項權重 (避免整張圖套濾鏡)")
+    parser.add_argument(
+        "--loss_color_space", type=str, default="rgb", choices=["rgb", "lab"],
+        help="distinguish/palette loss 在哪個色彩空間算對比。rgb = V9 以前的做法；"
+             "lab = V11，跟文獻指標 (eval_literature_metrics.py) 一樣在 CIELAB 上算",
+    )
+    parser.add_argument(
+        "--scale_weights", type=float, nargs=3, default=None,
+        help="distinguish loss 三個尺度 (1, 4, 16) 的權重，預設平均；V11 用 3 1 1 加重像素尺度",
+    )
+    parser.add_argument(
+        "--w_overshoot", type=float, default=0.0,
+        help="校正後 (CVD 模擬) 對比比原圖還強時的額外懲罰倍數，0 = 不加 (V9 以前)",
+    )
     parser.add_argument("--checkpoint_dir", type=str, default="./checkpoints")
     parser.add_argument("--save_every", type=int, default=5, help="每幾個 epoch 存一次checkpoint")
     parser.add_argument(
@@ -114,6 +127,13 @@ def main():
         w_distinguish=args.w_distinguish,
         w_palette=args.w_palette,
         w_bias=args.w_bias,
+        color_space=args.loss_color_space,
+        scale_weights=tuple(args.scale_weights) if args.scale_weights else None,
+        w_overshoot=args.w_overshoot,
+    )
+    print(
+        f"對比 loss 設定: color_space={args.loss_color_space} "
+        f"scale_weights={args.scale_weights or '平均'} w_overshoot={args.w_overshoot}"
     )
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
