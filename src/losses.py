@@ -56,14 +56,16 @@ def _gradient_magnitude(img: torch.Tensor) -> torch.Tensor:
 
 # V11 Lab loss：Lab 數值先除以這個數，讓 loss 量級跟 sRGB 版差不多，
 # 這樣 w_distinguish/w_palette 可以沿用 V9 的權重，對比 vs 自然度的平衡不變，比較時只差在「用哪個色彩空間」。
-# 實測 V9 輸出：除以 100 時 Lab 版 distinguish/palette 約是 sRGB 版的 4.6/4.1 倍，所以取 400。
-LAB_SCALE = 400.0
+# 要對齊的是「不校正時的 loss」(問題有多大)，不是校正後的 loss：
+# 不校正的 COCO 圖，除以 100 時 Lab 版 distinguish/palette ≈ 0.044/0.016，sRGB 版 0.026/0.017，量級相當。
+# (第一次試 V11 用 400，是對齊 V9 輸出算的，結果把校正誘因砍掉 3~4 倍，模型退化成幾乎不校正)
+LAB_SCALE = 100.0
 
 
-def _to_loss_space(img: torch.Tensor, color_space: str) -> torch.Tensor:
+def _to_loss_space(img: torch.Tensor, color_space: str, lab_scale: float = LAB_SCALE) -> torch.Tensor:
     """sRGB 0~1 -> 算對比 loss 用的色彩空間。"""
     if color_space == "lab":
-        return rgb_to_lab(img) / LAB_SCALE
+        return rgb_to_lab(img) / lab_scale
     return img
 
 
@@ -108,7 +110,7 @@ def distinguishability_loss(
     scales: tuple = (1, 4, 16),
     scale_weights: tuple = None,
     color_space: str = "rgb",
-    w_overshoot: float = 0.0,
+    w_overshoot: float = 0.0, lab_scale: float = LAB_SCALE,
 ) -> torch.Tensor:
     """
     核心的「有沒有真的幫到色弱患者」loss。
@@ -151,16 +153,16 @@ def distinguishability_loss(
             orig_scaled = original
             corrected_scaled = corrected
 
-        original_edges = grad_fn(_to_loss_space(orig_scaled, color_space))
+        original_edges = grad_fn(_to_loss_space(orig_scaled, color_space, lab_scale))
 
         if cvd_type_idx is not None:
             corrected_sim = simulate_cvd_per_sample(corrected_scaled, cvd_type_idx)
-            corrected_sim_edges = grad_fn(_to_loss_space(corrected_sim, color_space))
+            corrected_sim_edges = grad_fn(_to_loss_space(corrected_sim, color_space, lab_scale))
             total = total + sw * _contrast_error(corrected_sim_edges, original_edges, w_overshoot)
         else:
             for cvd_type in cvd_types:
                 corrected_sim = simulate_cvd(corrected_scaled, cvd_type)
-                corrected_sim_edges = grad_fn(_to_loss_space(corrected_sim, color_space))
+                corrected_sim_edges = grad_fn(_to_loss_space(corrected_sim, color_space, lab_scale))
                 total = total + sw * _contrast_error(corrected_sim_edges, original_edges, w_overshoot)
 
     n_types = 1 if cvd_type_idx is not None else len(cvd_types)
@@ -170,7 +172,7 @@ def distinguishability_loss(
 def palette_distance_loss(
     corrected: torch.Tensor, original: torch.Tensor,
     cvd_types: list = None, cvd_type_idx: torch.Tensor = None, grid: int = 8,
-    color_space: str = "rgb", w_overshoot: float = 0.0,
+    color_space: str = "rgb", w_overshoot: float = 0.0, lab_scale: float = LAB_SCALE,
 ) -> torch.Tensor:
     """
     補強 distinguishability_loss 的死角：邊緣型 loss 只看得到「相鄰交界處」，
@@ -191,19 +193,19 @@ def palette_distance_loss(
     orig_palette = F.adaptive_avg_pool2d(original, (grid, grid))
     corrected_palette = F.adaptive_avg_pool2d(corrected, (grid, grid))
 
-    orig_flat = _to_loss_space(orig_palette, color_space).flatten(2).transpose(1, 2)  # (B, grid*grid, 3)
+    orig_flat = _to_loss_space(orig_palette, color_space, lab_scale).flatten(2).transpose(1, 2)  # (B, grid*grid, 3)
     orig_dist = torch.cdist(orig_flat, orig_flat)  # (B, N, N) 任兩格的顏色距離 (原圖、正常視覺)
 
     if cvd_type_idx is not None:
         corrected_sim_palette = simulate_cvd_per_sample(corrected_palette, cvd_type_idx)
-        sim_flat = _to_loss_space(corrected_sim_palette, color_space).flatten(2).transpose(1, 2)
+        sim_flat = _to_loss_space(corrected_sim_palette, color_space, lab_scale).flatten(2).transpose(1, 2)
         sim_dist = torch.cdist(sim_flat, sim_flat)
         return _contrast_error(sim_dist, orig_dist, w_overshoot)
 
     total = 0.0
     for cvd_type in cvd_types:
         corrected_sim_palette = simulate_cvd(corrected_palette, cvd_type)
-        sim_flat = _to_loss_space(corrected_sim_palette, color_space).flatten(2).transpose(1, 2)
+        sim_flat = _to_loss_space(corrected_sim_palette, color_space, lab_scale).flatten(2).transpose(1, 2)
         sim_dist = torch.cdist(sim_flat, sim_flat)
         total = total + _contrast_error(sim_dist, orig_dist, w_overshoot)
 
@@ -238,8 +240,10 @@ class ColorCorrectionLoss(nn.Module):
         color_space: str = "rgb",
         scale_weights: tuple = None,
         w_overshoot: float = 0.0,
+        lab_scale: float = LAB_SCALE,
     ):
         super().__init__()
+        self.lab_scale = lab_scale
         self.color_space = color_space
         self.scale_weights = scale_weights
         self.w_overshoot = w_overshoot
@@ -258,10 +262,11 @@ class ColorCorrectionLoss(nn.Module):
         l_distinguish = distinguishability_loss(
             corrected, original, cvd_types, cvd_type_idx,
             scale_weights=self.scale_weights, color_space=self.color_space, w_overshoot=self.w_overshoot,
+            lab_scale=self.lab_scale,
         )
         l_palette = palette_distance_loss(
             corrected, original, cvd_types, cvd_type_idx,
-            color_space=self.color_space, w_overshoot=self.w_overshoot,
+            color_space=self.color_space, w_overshoot=self.w_overshoot, lab_scale=self.lab_scale,
         )
         l_bias = bias_penalty_loss(corrected, original)
 

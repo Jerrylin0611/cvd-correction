@@ -20,7 +20,7 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
 
 from dataset import DEFAULT_SPLIT_SEED, DEFAULT_TEST_RATIO, ColorImageFolder
-from losses import ColorCorrectionLoss
+from losses import LAB_SCALE, ColorCorrectionLoss
 from model import LightUNetColorCorrector
 from synthetic_colors import ConfusionPairBlocks, SyntheticColorBlocks
 
@@ -58,6 +58,10 @@ def parse_args():
     parser.add_argument(
         "--w_overshoot", type=float, default=0.0,
         help="校正後 (CVD 模擬) 對比比原圖還強時的額外懲罰倍數，0 = 不加 (V9 以前)",
+    )
+    parser.add_argument(
+        "--lab_scale", type=float, default=LAB_SCALE,
+        help="--loss_color_space lab 時 Lab 數值要除以多少，控制對比 loss 跟自然度 loss 的相對強度，見 losses.LAB_SCALE",
     )
     parser.add_argument("--checkpoint_dir", type=str, default="./checkpoints")
     parser.add_argument("--save_every", type=int, default=5, help="每幾個 epoch 存一次checkpoint")
@@ -130,9 +134,10 @@ def main():
         color_space=args.loss_color_space,
         scale_weights=tuple(args.scale_weights) if args.scale_weights else None,
         w_overshoot=args.w_overshoot,
+        lab_scale=args.lab_scale,
     )
     print(
-        f"對比 loss 設定: color_space={args.loss_color_space} "
+        f"對比 loss 設定: color_space={args.loss_color_space} lab_scale={args.lab_scale} "
         f"scale_weights={args.scale_weights or '平均'} w_overshoot={args.w_overshoot}"
     )
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
