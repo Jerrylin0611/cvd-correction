@@ -63,6 +63,7 @@ CHECKPOINTS = [
     ("V8", "checkpoints_v8/model_epoch50.pt"),
     ("V9", "checkpoints_v9/model_epoch50.pt"),
     ("V11", "checkpoints_v11/model_epoch50.pt"),
+    ("V12", "checkpoints_v12/model_epoch50.pt"),
 ]
 DATASETS = [
     ("COCO test", "../data/val2017", "test"),

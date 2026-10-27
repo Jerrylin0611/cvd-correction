@@ -1,0 +1,63 @@
+使用裝置: cuda
+訓練圖片數量: 4500 (真實照片，已保留 10% 當 held-out 測試集) + 675 (隨機合成純色色塊) + 675 (針對性混淆色對，三類型隨機混合)
+對比 loss 設定: color_space=lab lab_scale=50.0 scale_weights=平均 w_overshoot=0.0
+[Epoch 1/50] total=6.0501 natural=0.0879 structure=0.5459 distinguish=0.3594 palette=0.2370 bias=0.0046
+[Epoch 2/50] total=4.5305 natural=0.0366 structure=0.2711 distinguish=0.2384 palette=0.2113 bias=0.0005
+[Epoch 3/50] total=4.3975 natural=0.0219 structure=0.1736 distinguish=0.2275 palette=0.2102 bias=0.0002
+[Epoch 4/50] total=4.2734 natural=0.0176 structure=0.1317 distinguish=0.2204 palette=0.2054 bias=0.0002
+[Epoch 5/50] total=4.3061 natural=0.0181 structure=0.1140 distinguish=0.2217 palette=0.2075 bias=0.0002
+已儲存 checkpoint: checkpoints_v12\model_epoch5.pt
+[Epoch 6/50] total=4.2449 natural=0.0191 structure=0.1106 distinguish=0.2190 palette=0.2040 bias=0.0004
+[Epoch 7/50] total=4.2544 natural=0.0204 structure=0.1075 distinguish=0.2209 palette=0.2030 bias=0.0005
+[Epoch 8/50] total=4.1339 natural=0.0228 structure=0.1115 distinguish=0.2164 palette=0.1953 bias=0.0007
+[Epoch 9/50] total=4.0391 natural=0.0264 structure=0.1182 distinguish=0.2143 palette=0.1876 bias=0.0012
+[Epoch 10/50] total=3.9544 natural=0.0294 structure=0.1213 distinguish=0.2131 palette=0.1801 bias=0.0015
+已儲存 checkpoint: checkpoints_v12\model_epoch10.pt
+[Epoch 11/50] total=4.0119 natural=0.0316 structure=0.1250 distinguish=0.2169 palette=0.1819 bias=0.0018
+[Epoch 12/50] total=3.8917 natural=0.0488 structure=0.1739 distinguish=0.2223 palette=0.1632 bias=0.0029
+[Epoch 13/50] total=3.6901 natural=0.0542 structure=0.1809 distinguish=0.2154 palette=0.1494 bias=0.0037
+[Epoch 14/50] total=3.6228 natural=0.0539 structure=0.1684 distinguish=0.2122 palette=0.1461 bias=0.0037
+[Epoch 15/50] total=3.5160 natural=0.0549 structure=0.1629 distinguish=0.2069 palette=0.1406 bias=0.0037
+已儲存 checkpoint: checkpoints_v12\model_epoch15.pt
+[Epoch 16/50] total=3.5514 natural=0.0549 structure=0.1575 distinguish=0.2086 palette=0.1427 bias=0.0034
+[Epoch 17/50] total=3.4268 natural=0.0551 structure=0.1593 distinguish=0.2034 palette=0.1353 bias=0.0036
+[Epoch 18/50] total=3.3578 natural=0.0577 structure=0.1762 distinguish=0.2005 palette=0.1310 bias=0.0039
+[Epoch 19/50] total=3.1688 natural=0.0609 structure=0.1740 distinguish=0.1919 palette=0.1204 bias=0.0045
+[Epoch 20/50] total=3.0832 natural=0.0610 structure=0.1700 distinguish=0.1885 palette=0.1154 bias=0.0043
+已儲存 checkpoint: checkpoints_v12\model_epoch20.pt
+[Epoch 21/50] total=3.1195 natural=0.0621 structure=0.1691 distinguish=0.1886 palette=0.1184 bias=0.0053
+[Epoch 22/50] total=3.1094 natural=0.0619 structure=0.1695 distinguish=0.1878 palette=0.1183 bias=0.0050
+[Epoch 23/50] total=2.9664 natural=0.0634 structure=0.1714 distinguish=0.1791 palette=0.1124 bias=0.0056
+[Epoch 24/50] total=2.9654 natural=0.0657 structure=0.1740 distinguish=0.1802 palette=0.1109 bias=0.0061
+[Epoch 25/50] total=2.9959 natural=0.0643 structure=0.1699 distinguish=0.1808 palette=0.1134 bias=0.0062
+已儲存 checkpoint: checkpoints_v12\model_epoch25.pt
+[Epoch 26/50] total=2.9416 natural=0.0676 structure=0.1757 distinguish=0.1787 palette=0.1096 bias=0.0068
+[Epoch 27/50] total=2.9401 natural=0.0692 structure=0.1779 distinguish=0.1785 palette=0.1095 bias=0.0070
+[Epoch 28/50] total=2.9678 natural=0.0698 structure=0.1773 distinguish=0.1815 palette=0.1092 bias=0.0071
+[Epoch 29/50] total=2.8624 natural=0.0700 structure=0.1756 distinguish=0.1763 palette=0.1039 bias=0.0072
+[Epoch 30/50] total=2.8461 natural=0.0708 structure=0.1756 distinguish=0.1756 palette=0.1028 bias=0.0075
+已儲存 checkpoint: checkpoints_v12\model_epoch30.pt
+[Epoch 31/50] total=2.8416 natural=0.0693 structure=0.1715 distinguish=0.1751 palette=0.1031 bias=0.0072
+[Epoch 32/50] total=2.8061 natural=0.0702 structure=0.1713 distinguish=0.1731 palette=0.1013 bias=0.0075
+[Epoch 33/50] total=2.8037 natural=0.0692 structure=0.1677 distinguish=0.1729 palette=0.1014 bias=0.0074
+[Epoch 34/50] total=2.7830 natural=0.0692 structure=0.1667 distinguish=0.1727 palette=0.0998 bias=0.0070
+[Epoch 35/50] total=2.7560 natural=0.0706 structure=0.1705 distinguish=0.1706 palette=0.0987 bias=0.0076
+已儲存 checkpoint: checkpoints_v12\model_epoch35.pt
+[Epoch 36/50] total=2.7602 natural=0.0711 structure=0.1705 distinguish=0.1707 palette=0.0991 bias=0.0076
+[Epoch 37/50] total=2.7604 natural=0.0732 structure=0.1699 distinguish=0.1711 palette=0.0984 bias=0.0084
+[Epoch 38/50] total=2.7520 natural=0.0727 structure=0.1660 distinguish=0.1695 palette=0.0992 bias=0.0084
+[Epoch 39/50] total=2.7015 natural=0.0736 structure=0.1676 distinguish=0.1677 palette=0.0962 bias=0.0077
+[Epoch 40/50] total=2.7443 natural=0.0721 structure=0.1643 distinguish=0.1692 palette=0.0988 bias=0.0081
+已儲存 checkpoint: checkpoints_v12\model_epoch40.pt
+[Epoch 41/50] total=2.7143 natural=0.0728 structure=0.1638 distinguish=0.1681 palette=0.0971 bias=0.0078
+[Epoch 42/50] total=2.7053 natural=0.0725 structure=0.1649 distinguish=0.1677 palette=0.0967 bias=0.0075
+[Epoch 43/50] total=2.6767 natural=0.0719 structure=0.1646 distinguish=0.1648 palette=0.0965 bias=0.0080
+[Epoch 44/50] total=2.7144 natural=0.0724 structure=0.1623 distinguish=0.1680 palette=0.0974 bias=0.0075
+[Epoch 45/50] total=2.6790 natural=0.0717 structure=0.1623 distinguish=0.1657 palette=0.0959 bias=0.0078
+已儲存 checkpoint: checkpoints_v12\model_epoch45.pt
+[Epoch 46/50] total=2.6302 natural=0.0738 structure=0.1631 distinguish=0.1639 palette=0.0927 bias=0.0079
+[Epoch 47/50] total=2.7143 natural=0.0718 structure=0.1613 distinguish=0.1661 palette=0.0988 bias=0.0083
+[Epoch 48/50] total=2.7092 natural=0.0713 structure=0.1607 distinguish=0.1662 palette=0.0985 bias=0.0078
+[Epoch 49/50] total=2.6230 natural=0.0728 structure=0.1615 distinguish=0.1613 palette=0.0945 bias=0.0082
+[Epoch 50/50] total=2.6642 natural=0.0739 structure=0.1651 distinguish=0.1638 palette=0.0962 bias=0.0081
+已儲存 checkpoint: checkpoints_v12\model_epoch50.pt
