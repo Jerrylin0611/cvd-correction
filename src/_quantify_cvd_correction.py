@@ -48,6 +48,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 CHECKPOINTS = [
     ("V9", "checkpoints_v9/model_epoch50.pt"),
+    ("V11", "checkpoints_v11/model_epoch50.pt"),
     ("V8", "checkpoints_v8/model_epoch50.pt"),
 ]
 # (顯示名稱, 色弱類型, tritan 模擬模型)
@@ -214,10 +215,12 @@ with open("../confusion_pairs_results.csv", "w", newline="", encoding="utf-8-sig
         w.writerow({k: (f"{v:.2f}" if isinstance(v, float) else v) for k, v in r.items()})
 
 print("\n色弱模擬下兩色的 ΔE2000 (越大越分得出來)，各組 8 對的平均；自然度 = 校正後跟原色差多少 (越小越自然)")
-print(f"{'組別':<18}{'測試':<7}{'校正前':>8}{'V9':>8}{'V8':>8}{'V9自然度':>10}{'V8自然度':>10}")
+print(f"{'組別':<18}{'測試':<7}{'校正前':>8}" + "".join(f"{t:>8}" for t in models)
+      + "".join(f"{t + '自然度':>10}" for t in models))
 for (set_name, kind), s in summary.items():
-    print(f"{set_name:<18}{kind:<7}{np.mean(s['dE_sim_before']):>8.2f}{np.mean(s['dE_sim_V9']):>8.2f}"
-          f"{np.mean(s['dE_sim_V8']):>8.2f}{np.mean(s['dE_natural_V9']):>10.2f}{np.mean(s['dE_natural_V8']):>10.2f}")
+    print(f"{set_name:<18}{kind:<7}{np.mean(s['dE_sim_before']):>8.2f}"
+          + "".join(f"{np.mean(s[f'dE_sim_{t}']):>8.2f}" for t in models)
+          + "".join(f"{np.mean(s[f'dE_natural_{t}']):>10.2f}" for t in models))
 
 # ---- 長條圖：每組 (色塊/檢查圖) 校正前 vs V9 vs V8 ----
 fig, axes = plt.subplots(1, 2, figsize=(12, 4.2), sharey=True)
